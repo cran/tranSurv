@@ -1,0 +1,10 @@
+useDynLib(tranSurv)
+importFrom("survival", Surv, survfit)
+importFrom("SQUAREM", squarem)
+importFrom("graphics", "abline", "legend", "lines", "par",
+           "plot", "points", "title", "mtext", "text")
+importFrom("stats", "approx", "optimize", "pnorm", "uniroot")
+importFrom("utils", "head")
+export(tranSurvfit, condKendall, uncondKendall)
+S3method(print, condKendall)
+S3method(print, tranSurvfit)

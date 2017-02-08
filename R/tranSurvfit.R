@@ -13,6 +13,15 @@ condKendall <- function(trun, obs, delta = NULL, method = "MB",
     out <- NULL
     out$Call <- match.call()
     n <- length(trun)
+    if (class(trans) == "character") {
+        if (trans == "linear") FUN <- function(X, T, a) (T + a * X) / (1 + a)
+        if (trans == "log") FUN <- function(X, T, a) exp((log(replace(T, 0, 1)) + a * log(X)) / (1 + a))
+        if (trans == "log2") FUN <- function(X, T, a) exp((1 + a) * log(replace(T, 0, 1)) - a * log(X))
+        if (trans == "exp") FUN <- function(X, T, a) log((exp(T) + a * exp(X)) / (1 + a))
+    } else {
+        FUN <- match.fun(trans)
+    }
+    trun <- mapply(FUN, X = obs, T = trun, a = a)
     if (is.null(delta)) delta <- rep(1, length(trun))
     if (is.null(weights) & method == "MB") weights <- rep(1, 2 * n)
     if (is.null(weights) & method != "MB") {
@@ -24,11 +33,6 @@ condKendall <- function(trun, obs, delta = NULL, method = "MB",
         }
     }
     if (length(weights) == length(trun)) weights <- rep(weights, 2)
-    if (trans == "linear") trun <- (trun + a * obs) / (1 + a)
-    if (trans == "log" || trans == "log2") trun <- ifelse(trun == 0, 1, trun)
-    if (trans == "log") trun <- exp((log(trun) + a * log(obs)) / (1 + a))
-    if (trans == "log2") trun <- exp((1 + a) * log(trun) - a * log(obs))
-    if (trans == "exp") trun <- log((exp(trun) + a * exp(obs)) / (1 + a))
     if (is.null(weights) & method != "MB") {
         weights <- approx(sc$time, sc$surv, method = "constant",
                           xout = c(trun, obs), yleft = 1, yright = min(sc$surv))$y
@@ -46,8 +50,8 @@ condKendall <- function(trun, obs, delta = NULL, method = "MB",
                   tmp = as.double(res), PACKAGE = "tranSurv")$tmp
     }
     out$PE <- tmp[1]
-    out$SE <- sqrt(tmp[2])
-    out$STAT <- abs(tmp[1]) / sqrt(tmp[2])
+    out$SE <- ifelse(tmp[2] >= 0, sqrt(tmp[2]), NA)
+    out$STAT <- abs(out$PE) / out$SE
     out$p.value <- 2 - 2 * pnorm(out$STAT)
     out$trans <- trans
     out$a <- a
@@ -55,22 +59,19 @@ condKendall <- function(trun, obs, delta = NULL, method = "MB",
     out
 }
 
-getA <- function(a, trun, obs, delta = NULL, sc = NULL, trans = "linear", criterion = "PE") {
+getA <- function(a, trun, obs, delta = NULL, sc = NULL, FUN, test = "CK") {
     if (is.null(delta)) delta <- rep(1, length(trun))
-    if (trans == "linear") ta <- (trun + a * obs) / (1 + a)
-    if (trans == "log" || trans == "log2") trun <- ifelse(trun == 0, 1, trun)
-    if (trans == "log") ta <- exp((log(trun) + a * log(obs)) / (1 + a))
-    if (trans == "log2") ta <- exp((1 + a) * log(trun) - a * log(obs))
-    if (trans == "exp") ta <- log((exp(trun) + a * exp(obs)) / (1 + a))
+    FUN <- match.fun(FUN)
+    ta <- mapply(FUN, X = obs, T = trun, a = a)
     if (is.null(sc)) {
-        tmp <- condKendall(ta, obs, delta)
+        if (test == "CK") tmp <- condKendall(ta, obs, delta)
+        if (test == "PC") tmp <- pmcc(ta[delta == 1], obs[delta == 1])
      } else {
         weights <- approx(sc$time, sc$surv, method = "constant", xout = c(ta, obs),
                           yleft = 1, yright = min(sc$surv))$y
         tmp <- condKendall(ta, obs, delta, method = "IPW2", weights = weights)
     }
-    if (criterion == "PE") return(tmp$PE)
-    if (criterion != "PE") return(tmp$p.value)
+    return(list(PE = tmp$PE, p.value = tmp$p.value))
 }
 
 tauEm <- function(f0, aij, bij, obs, ta) {
@@ -87,11 +88,26 @@ tauLik <- function(f0, aij, bij, obs, ta) {
     -sum(log(ifelse(L <= 0, 1, L)))
 }
 
-tranSurvfit <- function(trun, obs, delta = NULL, trans = "linear", plots = FALSE, ...) {
+tranSurv.control <- function(interval = c(-1, 50), lower = min(interval), upper = max(interval)) {
+    list(lower = lower, upper = upper)
+}
+
+tranSurvfit <- function(trun, obs, delta = NULL, trans = "linear", plots = FALSE,
+                        control = tranSurv.control(), ...) {
     ## trun = truncation time
     ## obs = observed failure time
     ## delta = censoring indicator
     if (is.null(delta)) delta <- rep(1, length(trun))
+    if (class(trans) == "character") {
+        if (trans == "linear") FUN <- function(X, T, a) (T + a * X) / (1 + a)
+        if (trans == "log") FUN <- function(X, T, a) exp((log(replace(T, 0, 1)) + a * log(X)) / (1 + a))
+        if (trans == "log2") FUN <- function(X, T, a) exp((1 + a) * log(replace(T, 0, 1)) - a * log(X))
+        if (trans == "exp") FUN <- function(X, T, a) log((exp(T) + a * exp(X)) / (1 + a))
+    } else {
+        FUN <- match.fun(trans)
+    }
+    lower <- ifelse(control$lower == -Inf, -.Machine$integer.max, control$lower)
+    upper <- ifelse(control$upper == Inf, .Machine$integer.max, control$upper)
     ini <- condKendall(trun, obs, delta)
     ini.ipw <- condKendall(trun, obs, delta, method = "IPW2")    
     sc <- survfit(Surv(trun, obs, 1 - delta) ~ 1)
@@ -106,37 +122,37 @@ tranSurvfit <- function(trun, obs, delta = NULL, trans = "linear", plots = FALSE
     obs1 <- sort(obs[delta == 1])
     delta1 <- delta[delta == 1]
     yi <- unique(obs1)
-    ## solve for the transformation parameter, a
     byTau <- byP <- NULL
-    iniTau <- upTau <- getA(-.9999, trun1, obs1, delta1, sc, trans)
-    for (i in 1:100) {
-        upTau <- getA(i / 2 - 1, trun1, obs1, delta1, sc, trans)
-        if (sign(iniTau) != sign(upTau) & sign(iniTau) * sign(upTau) != 0) break
-    }
-    if (i < 100) {
-        tmp <- uniroot(f = getA, trun = trun1, obs = obs1, delta = delta1,
-                       sc = sc, trans = trans, interval = c(-.9999, i / 2 - 1))
-        byTau$par <- tmp$root
-        byTau$obj <- as.numeric(tmp$f.root)
+    p0 <- -as.numeric(coef(lm(trun ~ obs))[2])
+    byTau$par <- uniroot.all(f = function(x) sapply(x, function(y)
+        getA(y, trun1, obs1, sc = sc, FUN = FUN)$PE),
+        interval = c(lower + 1e-5, upper))
+    if (length(byTau$par) > 0) {
+        byTau$par <- unique(c(uniroot.all(f = function(x)
+            sapply(x, function(y) getA(y, trun1, obs1, sc = sc, FUN = FUN)$PE),
+            interval = c(lower + 1e-5, byTau$par[1])), byTau$par))
+        byTau$par <- sort(byTau$par)
+        byTau$obj <- sapply(byTau$par, function(x) getA(x, trun1, obs1, sc = sc, FUN = FUN)$PE)
     } else {
-        ## warning("Optimization over the interval (-1, 50).", call. = FALSE)
-        tmp <- optimize(f = function(x) abs(getA(x, trun1, obs1, delta1, sc, trans)),
-                        interval = c(-.9999, i / 2 - 1))
-        byTau$par <- tmp$minimum
-        byTau$obj <- as.numeric(tmp$objective) * sign(upTau)
-        if (abs(byTau$obj) > 0.05) 
-            warning("Best estimate does not achieve tau_c = 0. This model may not be appropriate.", call. = FALSE)
+        grids <- seq(lower + 1e-5, upper, length.out = 30)
+        tmp <- sapply(1:29, function(y) 
+            optimize(f = function(x) abs(getA(x, trun1, obs1, delta1, sc = sc, FUN = FUN)$PE),
+                     tol = .01, interval = c(grids[y], grids[y + 1])))
+        byTau$par <- as.numeric(tmp[1, which.min(tmp[2,])])
+        byTau$obj <- as.numeric(tmp[2, which.min(tmp[2,])])
     }
-    tmp <- optimize(f = function(x) getA(x, trun1, obs1, delta1, sc, trans, "P"),
-                    interval = c(-.999, i / 2), maximum = TRUE)
-    byP$par <- tmp$maximum
-    byP$obj <- as.numeric(tmp$objective)
-    a <- byTau$par
-    if (trans == "linear") ta <- (trun1 + a * obs1) / (1 + a)
-    if (trans == "log" || trans == "log2") trun1 <- ifelse(trun1 == 0, 1, trun1)
-    if (trans == "log") ta <- exp((log(trun1) + a * log(obs1)) / (1 + a))
-    if (trans == "log2") ta <- exp((1 + a) * log(trun1) - a * log(obs1))
-    if (trans == "exp") ta <- log((exp(trun1) + a * exp(obs1)) / (1 + a))
+    suppressWarnings(tmpP <- optimize(f = function(x) getA(x, trun1, obs1, delta1, sc = sc, FUN = FUN)$p.value, interval = c(lower, 2 * byTau$par[1] + 1), maximum = TRUE))
+    byP$par <- tmpP$maximum
+    byP$obj <- tmpP$objective
+    tmp <- getA(byTau$par[1], trun1, obs1, sc = sc, FUN = FUN)$p.value
+    byP$par <- ifelse(!is.na(tmp) & tmp > byP$obj, byTau$par[1], byP$par)
+    byP$obj <- ifelse(!is.na(tmp) & tmp > byP$obj, tmp, byP$obj)
+    if (abs(byTau$obj[1]) > 0.1 || byP$obj < 0.6)
+        warning("Best estimate does not achieve tau_c = 0. This model may not be appropriate.", call. = FALSE)
+    a <- byTau$par[1]
+    ta <- mapply(FUN, X = obs1, T = trun1, a = a)
+    wgtT <- approx(sc$time, sc$surv, ta, "constant", yleft = 1, yright = min(sc$surv))$y
+    wgtX <- approx(sc$time, sc$surv, obs1, "constant", yleft = 1, yright = min(sc$surv))$y
     ## Turnbull's algorithm
     scX <- approx(sc$time, sc$surv, method = "constant", f = 0,
                   xout = yi, yleft = 1, yright = min(sc$surv))$y
@@ -160,7 +176,7 @@ tranSurvfit <- function(trun, obs, delta = NULL, trans = "linear", plots = FALSE
     ## Make plots 
     if (plots) {
         op1 <- par(mfrow = c(2,1), oma = c(1,1,1,1) + 0.1, mar = c(3.7,3,1,1) + 0.2)
-        plot(trun1, obs1, cex = .4, main = "", xlab = "", ylab = "", pch = 4)
+        plot(trun, obs, cex = .4, main = "", xlab = "", ylab = "", pch = 4)
         mtext("x: uncensored   o: censored", 3, line = .1, cex = .9)
         mtext(expression(bold("Before transformation")), 3, line = .8, cex = 1.2)
         points(trun[delta == 0], obs[delta == 0], cex = .4, pch = 1)
@@ -171,30 +187,41 @@ tranSurvfit <- function(trun, obs, delta = NULL, trans = "linear", plots = FALSE
         points(trun[delta == 0], obs[delta == 0], cex = .4, pch = 1)
         title(xlab = "Truncation times", ylab = "Failure times", line = 2, cex.lab = 1)
         par(op1)
-        
+
         op1 <- par(mfrow = c(2,1), oma = c(1,1,1,1) + 0.1, mar = c(3.7,3,1,1.5) + 0.2, ask = TRUE)
-        if (byTau$par > -.8)
-            run <- c(seq(-1, max(-1, byTau$par - .2), length = 20),
-                     seq(max(-1, byTau$par - .2), byTau$par + .2, .015),
-                     seq(byTau$par + .2, 2 * byTau$par + 1, length = 20)) + 1e-5
-        if (byTau$par <= -.8)
-            run <- sort(unique(c(seq(-1, 2 * byTau$par + 1.01, length = 60) + 1e-5, byTau$par)))
-        Ytau <- sapply(run, function(x) getA(x, trun1, obs1, delta1, sc, trans))
-        plot(run, Ytau, "l", xlab = "", ylab = "",
-             main = paste("Estimate a by restricted IPW Kendall's tau", " (a = ", round(byTau$par, 3), ")", sep = ""))
+        if (a > lower + .2)
+            run <- c(seq(lower, max(lower, a - .2), length = 30),
+                     seq(max(lower, a - .2), a + .2, .01),
+                     seq(a + .2, 2 * a + 1, length = 30)) + 1e-5
+        if (a <= lower + .2)
+            run <- sort(unique(c(seq(lower, 2 * a + 1.01, length = 80) + 1e-5, a)))
+        Ytau <- sapply(run, function(x) getA(x, trun1, obs1, delta1, sc, FUN)$PE)
+        if (min(abs(Ytau), na.rm = TRUE) < byTau$obj[1]) {
+            a <- byTau$par[1] <- run[which.min(abs(Ytau))]
+            byTau$obj[1] <- min(abs(Ytau))
+        }
+        plot(run, Ytau, "l", xlab = "", ylab = "", xlim = c(max(min(run),lower), min(max(run), upper)), 
+             ylim = range(Ytau, na.rm = TRUE), 
+             main = paste("Estimate a by restricted IPW Kendall's tau", " (a = ", round(a, 3), ")",
+                          sep = ""))
         title(xlab = "a", ylab = expression(tau[c]), line = 2, cex.lab = 1)
-        abline(v = byTau$par, lty = 3)
-        abline(h = byTau$obj, lty = 3)
-        text(x = max(run), y = byTau$obj, labels = format(round(byTau$obj, 2), nsmall = 2),
+        abline(v = a, lty = 3)
+        abline(h = byTau$obj[1], lty = 3)
+        text(x = max(run), y = byTau$obj[1], labels = format(round(byTau$obj[1], 2), nsmall = 2),
              pos = 4, cex = .8, xpd = TRUE, srt = 0, offset = 1.5)
-        if (byP$par > -.8)
-            run <- c(seq(-1, max(-1, byP$par - .2), length = 20),
-                     seq(max(-1, byP$par - .2), byP$par + .2, .015),
-                     seq(byP$par + .2, 2 * byP$par + 1, length = 20)) + 1e-5
-        if (byP$par <= -.8)
-            run <- sort(unique(c(seq(-1, 2 * byP$par + 1.01, length = 60) + 1e-5, byP$par)))
-        Yp <- sapply(run, function(x) getA(x, trun1, obs1, delta1, sc, trans, "p"))
-        plot(run, Yp, "l", xlab = "", ylab = "",
+        if (byP$par > lower + .2)
+            run <- c(seq(lower, max(lower, byP$par - .2), length = 30),
+                     seq(max(lower, byP$par - .2), byP$par + .2, .01),
+                     seq(byP$par + .2, 2 * byP$par + 1, length = 30)) + 1e-5
+        if (byP$par <= lower + .2)
+            run <- sort(unique(c(seq(lower, 2 * byP$par + 1.01, length = 80) + 1e-5, byP$par)))
+        Yp <- sapply(run, function(x) getA(x, trun1, obs1, delta1, sc, FUN)$p.value)
+        if (max(Yp, na.rm = TRUE) > byP$obj) {
+            byP$par <- run[which.max(Yp)]
+            byP$obj <- max(Yp, na.rm = TRUE)
+        }
+        plot(run, Yp, "l", xlab = "", ylab = "", xlim = c(max(min(run),lower), min(max(run), upper)),
+             ylim = range(Yp, na.rm = TRUE), 
              main = paste("Estimate a by p-value", " (a = ", round(byP$par, 3), ")", sep = ""))
         title(xlab = "a", ylab = "p-values", line = 2, cex.lab = 1)
         abline(v = byP$par, lty = 3)
@@ -205,14 +232,15 @@ tranSurvfit <- function(trun, obs, delta = NULL, trans = "linear", plots = FALSE
         par(op1)
 
         op2 <- par(mar = c(3.5, 3.5, 2.5, 2.5), ask = TRUE)
-        plot(sort(obs), Sy, "l", xlab = "", ylab = "")
+        plot(sort(obs), Sy, xlab = "", ylab = "", "s")
         mtext(expression(bold("Survival estimation")), 3, line = .5, cex = 1.2)
         title(xlab = "Time", ylab = "Survival probability", line = 2, cex.lab = 1)
-        lines(S0$time, S0$surv, lty = 2)
+        lines(S0$time, S0$surv, lty = 2, "s")
         legend("topright", c("Transformation", "Kaplan-Meier"), lty = 1:2, bty = "n")
         par(op2)
     }
-    out <- list(Sy = Sy, byTau = byTau, byP = byP, qind = data.frame(trun = ta, obs = obs1))
+    out <- list(Sy = Sy, byTau = byTau, byP = byP,
+                qind = data.frame(trun = ta, obs = obs1, wgtT = wgtT, wgtX = wgtX))
     out$Call <- match.call()
     out$iniKendall <- ini$PE
     out$iniKendall.ipw <- ini.ipw$PE
@@ -222,3 +250,52 @@ tranSurvfit <- function(trun, obs, delta = NULL, trans = "linear", plots = FALSE
     out
 }
 
+gofPlot <- function(trun, obs, delta = NULL) {
+    n <- length(obs)
+    if (is.null(delta)) delta <- rep(1, length(trun))
+    sc <- survfit(Surv(trun, obs, 1 - delta) ~ 1)
+    if (length(table(delta)) > 1 & 
+        sum(head(sc$n.event[sc$n.event > 0]/sc$n.risk[sc$n.event > 0]) == 1) <= 2) {
+        sc$time <- sc$time[sc$n.event > 0]
+        sc$surv <- exp(-cumsum(sc$n.event[sc$n.event > 0]/sc$n.risk[sc$n.event > 0]))
+    }
+    fit <- tranSurvfit(trun, obs, delta)
+    ta <- fit$qind$trun
+    xa <- fit$qind$obs
+    Fw <- survfit(Surv(-obs, -trun, rep(1, length(obs))) ~ 1, data = fit$qind)
+    Fwz <- approx(-Fw$time, Fw$surv, method = "constant", xout = unique(sort(xa)), yleft = 0, yright = 1)$y
+    fx <- diff(c(0, 1 - fit$Sy))
+    fxz <- approx(sort(obs), fx, method = "constant", yleft = 0, yright = 0, xout = unique(sort(xa)))$y
+    Scz <- approx(sc$time, sc$surv, method = "constant", yleft = 0, yright = 1, xout=unique(sort(xa)))$y
+    gof <- fxz * Fwz * Scz
+    s0 <- survfit(Surv(obs, rep(1, n)) ~ 1)
+    plot(unique(sort(xa)), cumsum(gof) / sum(gof), "s", xlab = "Time", main = "Goodness of fit")
+    lines(s0$time, 1 - s0$surv, "s", col = 2)
+    legend("topleft", c("Transformation GOF", "ECDF"), col = 1:2, lty = 1, bty = "n")
+}
+
+pmcc <- function(trun, obs, a = 0, trans = "linear", ...) {
+    out <- NULL
+    out$Call <- match.call()
+    n <- length(trun)
+    if (class(trans) == "character") {
+        if (trans == "linear") FUN <- function(X, T, a) (T + a * X) / (1 + a)
+        if (trans == "log") FUN <- function(X, T, a) exp((log(replace(T, 0, 1)) + a * log(X))/(1 + a))
+        if (trans == "log2") FUN <- function(X, T, a) exp((1 + a) * log(replace(T, 0, 1)) - a * log(X))
+        if (trans == "exp") FUN <- function(X, T, a) log((exp(T) + a * exp(X)) / (1 + a))
+    } else {
+        FUN <- match.fun(trans)
+    }
+    trun <- mapply(FUN, X = obs, T = trun, a = a)
+    res <- vector("double", 2)
+    pmc <- .C("pmcc", as.double(trun), as.double(obs), as.integer(n),
+              tmp = as.double(res), PACKAGE = "tranSurv")$tmp
+    out$PE <- pmc[1]
+    out$SE <- pmc[2]
+    out$STAT <- pmc[1] / sqrt(pmc[2])
+    out$p.value <- 2 - 2 * pnorm(abs(pmc[1]) / sqrt(pmc[2]))
+    out$trans <- trans
+    out$a <- a
+    class(out) <- "pmcc"
+    return(out)
+}

@@ -16,8 +16,8 @@
   \tabular{ll}{
     Package: tranSurv
     Type: Package
-    Version: 0.0-4
-    Date: 2016-07-01
+    Version: 1.1-4
+    Date: 2017-02-05
     License: GPL(>=3)
     LazyLoad: yes
   }

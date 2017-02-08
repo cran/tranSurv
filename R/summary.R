@@ -1,10 +1,20 @@
 print.condKendall <- function(x, ...) {
-    cat("\n Test for quasi-independence \n")
+    cat("\n Test for quasi-independence with conditional Kendall's tau\n")
     cat("\n Call: ")
     print(x$Call)
     if (x$a != 0)
         cat(paste("\nTransformation is applied with parameter a =", round(x$a, 4)))
     cat(paste("\n", "Kendall's tau =", round(x$PE, 4), ", SE =", round(x$SE, 4),
+              ", Z =", round(x$STAT, 4), ", p-value = ", round(x$p.value, 4), "\n\n"))
+}
+
+print.pmcc <- function(x, ...) {
+    cat("\n Test for quasi-independence with conditional correlation coefficient\n")
+    cat("\n Call: ")
+    print(x$Call)
+    if (x$a != 0)
+        cat(paste("\nTransformation is applied with parameter a =", round(x$a, 4)))
+    cat(paste("\n", "Correlation coefficient =", round(x$PE, 4), ", SE =", round(x$SE, 4),
               ", Z =", round(x$STAT, 4), ", p-value = ", round(x$p.value, 4), "\n\n"))
 }
 

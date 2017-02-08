@@ -71,3 +71,33 @@ void condKendall(double *t1, double *t2, double *d, int *n, double *weights,
   out;
 }
 
+void pmcc(double *t1, double *t2, int *n, double *out) {
+  int i, j, k;
+  double STT = 0.0;
+  double SXT = 0.0;
+  double SXX = 0.0;
+  double tmp = 0.0; 
+  for (i = 0; i < *n; i++) {
+    for (j = 0; j < *n; j++) {
+      if (fmax(t1[i], t1[j]) <= fmin(t2[i], t2[j])) {
+	STT += (t1[i] - t1[j]) * (t1[i] - t1[j]);
+	SXT += (t1[i] - t1[j]) * (t2[i] - t2[j]);
+	SXX += (t2[i] - t2[j]) * (t2[i] - t2[j]);
+      }
+    }
+  }
+  out[0] = SXT / sqrt(STT * SXX); 
+  for (i = 0; i < *n; i++) {
+    tmp = 0.0;
+    for (j = 0; j < (*n - 1); j++) {
+      if (fmax(t1[i], t1[j]) <= fmin(t2[i], t2[j])) {
+	tmp += (t2[i] - t2[j]) * (t2[i] - t2[j]) / SXX + (t1[i] - t1[j]) * (t1[i] - t1[j]) / STT -
+	  2 * (t1[i] - t1[j]) * (t2[i] - t2[j]) / SXT;
+      }
+    }
+    out[1] += tmp * tmp;     
+  }
+  out[1] = out[1] * out[0] * out[0]; 
+  out;
+}
+

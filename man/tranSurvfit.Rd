@@ -13,7 +13,8 @@
   truncation time and the event time are completely left unspecified.
 }
 \usage{
-tranSurvfit(trun, obs, delta = NULL, trans = "linear", plots = FALSE, ...) 
+tranSurvfit(trun, obs, delta = NULL, trans = "linear", plots = FALSE,
+control = tranSurv.control(), ...) 
 }
 \arguments{
   \item{trun}{left truncation time, satisfying trun <= obs.}
@@ -31,6 +32,8 @@ tranSurvfit(trun, obs, delta = NULL, trans = "linear", plots = FALSE, ...)
   \item{plots}{an optional logical value; if TRUE, a series of
     diagnostic plots as well as the survival curve for the observed
     failure time will be plotted.}
+  \item{control}{controls lower and upper bounds when
+    \code{trans} is an user specified function.}
   \item{...}{ for future methods.}
 }
 \details{

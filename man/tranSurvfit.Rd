@@ -14,7 +14,7 @@
 }
 \usage{
 tranSurvfit(trun, obs, delta = NULL, trans = "linear", plots = FALSE,
-control = tranSurv.control(), ...) 
+covariate = NULL, control = tranSurv.control(), ...) 
 }
 \arguments{
   \item{trun}{left truncation time, satisfying trun <= obs.}
@@ -32,6 +32,8 @@ control = tranSurv.control(), ...)
   \item{plots}{an optional logical value; if TRUE, a series of
     diagnostic plots as well as the survival curve for the observed
     failure time will be plotted.}
+  \item{covariate}{an optional logical value; if TRUE, covariates
+    will be included in the output data.frame \code{qind}.}
   \item{control}{controls lower and upper bounds when
     \code{trans} is an user specified function.}
   \item{...}{ for future methods.}

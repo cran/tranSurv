@@ -34,8 +34,8 @@ void condKendall(double *t1, double *t2, double *d, int *n, double *weights,
   double M = 0.0;
   for (i = 0; i < (*n - 1); i++) {
     for (j = i + 1; j < *n; j++) {
-      if (fmax(t1[i], t1[j]) <= fmin(t2[i], t2[j]) & 
-	  d[i] * (t2[i] <= t2[j]) + d[j] * (t2[j] <= t2[i]) > 0 &
+      if (fmax(t1[i], t1[j]) <= fmin(t2[i], t2[j]) &&
+	  d[i] * (t2[i] <= t2[j]) + d[j] * (t2[j] <= t2[i]) > 0 &&
 	  weights[i] * weights[j] * weights[i + *n] * weights[j + *n] > 0) {
 	tmp = (t1[i] - t1[j]) * (t2[i] - t2[j]);
 	sgn = (tmp > 0) - (tmp < 0);

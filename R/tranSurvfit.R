@@ -92,11 +92,12 @@ tranSurv.control <- function(interval = c(-1, 50), lower = min(interval), upper 
     list(lower = lower, upper = upper)
 }
 
-tranSurvfit <- function(trun, obs, delta = NULL, trans = "linear", plots = FALSE,
+tranSurvfit <- function(trun, obs, delta = NULL, trans = "linear", plots = FALSE, covariate = NULL,
                         control = tranSurv.control(), ...) {
     ## trun = truncation time
     ## obs = observed failure time
     ## delta = censoring indicator
+    out <- NULL
     if (is.null(delta)) delta <- rep(1, length(trun))
     if (class(trans) == "character") {
         if (trans == "linear") FUN <- function(X, T, a) (T + a * X) / (1 + a)
@@ -117,6 +118,9 @@ tranSurvfit <- function(trun, obs, delta = NULL, trans = "linear", plots = FALSE
         sc$time <- sc$time[sc$n.event > 0]
         sc$surv <- exp(-cumsum(sc$n.event[sc$n.event > 0]/sc$n.risk[sc$n.event > 0]))
     }
+    if (is.null(covariate)) out$qind <- subset(data.frame(trun = trun, obs = obs, delta = delta), delta == 1)
+    else out$qind <- subset(data.frame(trun = trun, obs = obs, delta = delta, Z = covariate), delta == 1)
+    out$qind <- out$qind[order(out$qind$obs),]
     y0 <- sort(obs)
     trun1 <- trun[order(obs)][delta[order(obs)] == 1]
     obs1 <- sort(obs[delta == 1])
@@ -147,12 +151,12 @@ tranSurvfit <- function(trun, obs, delta = NULL, trans = "linear", plots = FALSE
     tmp <- getA(byTau$par[1], trun1, obs1, sc = sc, FUN = FUN)$p.value
     byP$par <- ifelse(!is.na(tmp) & tmp > byP$obj, byTau$par[1], byP$par)
     byP$obj <- ifelse(!is.na(tmp) & tmp > byP$obj, tmp, byP$obj)
-    if (abs(byTau$obj[1]) > 0.1 || byP$obj < 0.6)
+    if (abs(byTau$obj[1]) > 0.1)
         warning("Best estimate does not achieve tau_c = 0. This model may not be appropriate.", call. = FALSE)
     a <- byTau$par[1]
-    ta <- mapply(FUN, X = obs1, T = trun1, a = a)
-    wgtT <- approx(sc$time, sc$surv, ta, "constant", yleft = 1, yright = min(sc$surv))$y
-    wgtX <- approx(sc$time, sc$surv, obs1, "constant", yleft = 1, yright = min(sc$surv))$y
+    out$qind$ta <- ta <- mapply(FUN, X = obs1, T = trun1, a = a)
+    out$qind$wgtT <- approx(sc$time, sc$surv, ta, "constant", yleft = 1, yright = min(sc$surv))$y
+    out$qind$wgtX <- approx(sc$time, sc$surv, obs1, "constant", yleft = 1, yright = min(sc$surv))$y
     ## Turnbull's algorithm
     scX <- approx(sc$time, sc$surv, method = "constant", f = 0,
                   xout = yi, yleft = 1, yright = min(sc$surv))$y
@@ -187,7 +191,6 @@ tranSurvfit <- function(trun, obs, delta = NULL, trans = "linear", plots = FALSE
         points(trun[delta == 0], obs[delta == 0], cex = .4, pch = 1)
         title(xlab = "Truncation times", ylab = "Failure times", line = 2, cex.lab = 1)
         par(op1)
-
         op1 <- par(mfrow = c(2,1), oma = c(1,1,1,1) + 0.1, mar = c(3.7,3,1,1.5) + 0.2, ask = TRUE)
         if (a > lower + .2)
             run <- c(seq(lower, max(lower, a - .2), length = 30),
@@ -230,7 +233,6 @@ tranSurvfit <- function(trun, obs, delta = NULL, trans = "linear", plots = FALSE
             text(x = max(run), y = byP$obj, labels = format(round(byP$obj, 2), nsmall = 2),
                  pos = 4, cex = .8, xpd = TRUE, srt = 0, offset = 1.5)
         par(op1)
-
         op2 <- par(mar = c(3.5, 3.5, 2.5, 2.5), ask = TRUE)
         plot(sort(obs), Sy, xlab = "", ylab = "", "s")
         mtext(expression(bold("Survival estimation")), 3, line = .5, cex = 1.2)
@@ -239,8 +241,11 @@ tranSurvfit <- function(trun, obs, delta = NULL, trans = "linear", plots = FALSE
         legend("topright", c("Transformation", "Kaplan-Meier"), lty = 1:2, bty = "n")
         par(op2)
     }
-    out <- list(Sy = Sy, byTau = byTau, byP = byP,
-                qind = data.frame(trun = ta, obs = obs1, wgtT = wgtT, wgtX = wgtX))
+    out$Sy <- Sy
+    out$byTau <- byTau
+    out$byP <- byP
+    ## out <- list(Sy = Sy, byTau = byTau, byP = byP,
+    ##             qind = data.frame(trun = ta, obs = obs1, wgtT = wgtT, wgtX = wgtX))
     out$Call <- match.call()
     out$iniKendall <- ini$PE
     out$iniKendall.ipw <- ini.ipw$PE

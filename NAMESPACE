@@ -1,4 +1,4 @@
-useDynLib(tranSurv)
+useDynLib(tranSurv, .registration = TRUE)
 importFrom("survival", Surv, survfit)
 importFrom("SQUAREM", squarem)
 importFrom("rootSolve", uniroot.all)

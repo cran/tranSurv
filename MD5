@@ -1,11 +1,12 @@
-b3854a38ea750a9ae2bec73481309f66 *DESCRIPTION
-5fdbde3b1eb9377587d0da1697dc0a4b *NAMESPACE
+364e238b5ed516c1f402e922db2f3545 *DESCRIPTION
+a237d4e3ac3e7956262583b4b033b65a *NAMESPACE
 e477e5edfb13ea59bdbae5b21b19accf *R/summary.R
-628e95d09e052c347a3a3948c114ff04 *R/tranSurvfit.R
+2947513e6251a8c47f2bce362b5de492 *R/tranSurvfit.R
 2631e05793635d4d7cbe1ea1d52b171c *man/condKendall.Rd
 771588081989163785e671952bb0679c *man/pmcc.Rd
 11d88310c1cc7001acb431da2ef1539c *man/tranSurv-package.Rd
 61c654d6d24cdb6c53bfcf5482de6801 *man/tranSurv.control.Rd
-54e3e1eea2ae3022082cebd03dffff01 *man/tranSurvfit.Rd
+581097653d122c6db306dac460d26d2b *man/tranSurvfit.Rd
 768a158c36d88aea3c5701d189488080 *man/uncondKendall.Rd
-c50fd933df4585fb8e069414dcc59875 *src/getKendall.c
+fd00082cff9e3855af0fb132241f11d3 *src/getKendall.c
+7c22b1b500cab25872924e218f1645f5 *src/registerDynamicSymbol.c

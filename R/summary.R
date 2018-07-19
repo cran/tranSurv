@@ -1,3 +1,4 @@
+#' @export
 print.condKendall <- function(x, ...) {
     cat("\n Test for quasi-independence with conditional Kendall's tau\n")
     cat("\n Call: ")
@@ -8,6 +9,7 @@ print.condKendall <- function(x, ...) {
               ", Z =", round(x$STAT, 4), ", p-value = ", round(x$p.value, 4), "\n\n"))
 }
 
+#' @export
 print.pmcc <- function(x, ...) {
     cat("\n Test for quasi-independence with conditional correlation coefficient\n")
     cat("\n Call: ")
@@ -18,7 +20,8 @@ print.pmcc <- function(x, ...) {
               ", Z =", round(x$STAT, 4), ", p-value = ", round(x$p.value, 4), "\n\n"))
 }
 
-print.tranSurvfit <- function(x, ...) {
+#' @export
+print.trSurvfit <- function(x, ...) {
     cat("\n Fitting structural transformation model \n")
     cat("\n Call: ")
     print(x$Call)

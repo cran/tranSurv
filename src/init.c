@@ -1,7 +1,9 @@
-#include <R.h>
 #include <stdlib.h> // for NULL
-#include <Rinternals.h>
 #include <R_ext/Rdynload.h>
+
+/* FIXME: 
+   Check these declarations against the C/Fortran source code.
+*/
 
 /* .C calls */
 extern void condKendallC(void *, void *, void *, void *, void *, void *, void *);
@@ -22,3 +24,4 @@ void R_init_tranSurv(DllInfo *dll)
     R_registerRoutines(dll, CEntries, NULL, NULL, NULL);
     R_useDynamicSymbols(dll, FALSE);
 }
+

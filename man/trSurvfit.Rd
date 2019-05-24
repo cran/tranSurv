@@ -27,7 +27,7 @@ denote events.}
 
 \item{covariate}{an optional logical value; if TRUE, covariates will be included in the output data.frame \code{qind}.}
 
-\item{control}{controls lower and upper bounds when \code{trans} is an user specified function.}
+\item{control}{controls the lower and upper bounds when \code{trans} is an user specified function.}
 
 \item{...}{for future methods.}
 }
@@ -65,30 +65,12 @@ At the current version, three transformation structures can be specified. \code{
 \code{trans = "exp"} corresponds to \deqn{h(X) = exp(X)}.
 }
 \examples{
-## Generate simulated data from a transformation model
-datgen <- function(n) {
-    a <- -0.3
-    X <- rweibull(n, 2, 4) ## failure times
-    U <- rweibull(n, 2, 1) ## latent truncation time
-    T <- (1 + a) * U - a * X ## apply transformation
-    C <- 10 ## censoring
-    dat <- data.frame(trun = T, obs = pmin(X, C), delta = 1 * (X <= C))
-    return(subset(dat, trun <= obs))
-}
-
-set.seed(123)
-dat <- datgen(300)
-fit <- with(dat, trSurvfit(trun, obs, delta))
+\dontrun{
+data(channing, package = "boot")
+chan <- subset(channing, sex == "Male" & entry < exit)
+fit <- with(chan, trSurvfit(entry, exit, cens))
 fit
-
-## Checking the transformation parameter
-fit$byTau$par
-fit$byTau$obj
-with(dat, condKendall(trun, obs, delta, method = "IPW2", a = fit$byTau$par[1]))$PE
-
-fit$byP$par
-fit$byP$obj
-with(dat, condKendall(trun, obs, delta, method = "IPW2", a = fit$byP$par[1]))$p.value
+}
 }
 \references{
 Martin E. and Betensky R. A. (2005), Testing quasi-independence of failure and truncation times via conditional Kendall's tau,

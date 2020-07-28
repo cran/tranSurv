@@ -1,6 +1,6 @@
 #' Kendall's tau
 #'
-#' Computes the Unconditional Kendall's Tau
+#' Computes the unconditional Kendall's tau
 #'
 #' This function computes the unconditional Kendall's tau (the Kendall rank correlation coefficient) for two variables.
 #' The returned value is equivalent to that from \code{cor} with \code{method = "kendall"}, but \code{kendall} is
@@ -13,13 +13,7 @@
 #' @export
 #' @references Kendall, M. G. (1938), A new measure of rank correlation, \emph{Biometrika}, 81--93.
 #' @seealso \code{\link{cor}}
-#' @examples
-#' library(MASS)
-#' set.seed(1)
-#' dat <- mvrnorm(5000, c(0, 0), matrix(c(1, .5, .5, 1), 2))
-#' ## True kendall's tau is 2 * asin(.5) / pi
-#' system.time(print(kendall(dat)))
-#' system.time(print(cor(dat, method = "kendall")))
+#' @example inst/examples/ex_kendalls.R
 kendall <- function(x, y = NULL) {
     if (is.null(y)) {
         if (NCOL(x) != 2L) stop("Two variables are required.")
@@ -39,7 +33,7 @@ kendall <- function(x, y = NULL) {
 
 #' Conditional Kendall's tau
 #'
-#' Computes the Conditional Kendall's Tau and Inference
+#' Computes the conditional Kendall's tau and inference
 #'
 #' This function performs statistical test for quasi-independence between truncation time and failure time.
 #' The hypothesis test is based on the conditional Kendall's tau of Martin and Betensky (2005) and
@@ -58,14 +52,14 @@ kendall <- function(x, y = NULL) {
 #' @param trun left truncation time satisfying \code{trun} <= \code{obs}.
 #' @param obs observed failure time, must be the same length as \code{trun}, might be right-censored.
 #' @param delta an optional 0-1 vector of censoring indicator (0 = censored, 1 = event) for \code{obs}.
-#' If this vector is not specified, \code{condKendall} assumes no censoring and all observed failure time
+#' If this vector is not specified, \code{cKendall} assumes no censoring and all observed failure time
 #' denote events.
 #' @param method a character string specifying the different version of conditional Kendall's tau to be computed.
 #' The following are permitted:
 #' \describe{
-#'   \item{\code{MB}}{conditional Kendall's tau proposed in Martin and Betensky (2005) as \eqn{\hat{\tau_c},}}
-#'   \item{\code{IPW1}}{inverse probability weighted estimator proposed in Austin and Betensky (2014) as \eqn{\hat{\tau_{c2}},}}
-#'   \item{\code{IPW2}}{restricted inverse probability weighted estimator proposed in Austin and Betensky (2014) as \eqn{\hat{\tau_{c3}}.}}
+#'   \item{\code{MB}}{conditional Kendall's tau proposed in Martin and Betensky (2005) as \eqn{\hat{\tau}_c,}}
+#'   \item{\code{IPW1}}{inverse probability weighted estimator proposed in Austin and Betensky (2014) as \eqn{\hat{\tau}_{c2},}}
+#'   \item{\code{IPW2}}{restricted inverse probability weighted estimator proposed in Austin and Betensky (2014) as \eqn{\hat{\tau}_{c3}.}}
 #' }
 #' @param weights an optional vector of sampling weights used when \code{method = IPW1} or \code{method = IPW2}.
 #' Inverse probability censored weighting (IPCW) is the default.
@@ -86,15 +80,8 @@ kendall <- function(x, y = NULL) {
 #' \emph{Journal of the American Statistical Association}, \bold{100} (470): 484-492.
 #' @references Austin, M. D. and Betensky R. A. (2014), Eliminating bias due to censoring in Kendall's tau estimators for quasi-independence of truncation and failure,
 #' \emph{Computational Statistics & Data Analysis}, \bold{73}: 16-26.
-#' @examples
-#' data(channing, package = "boot")
-#' chan <- subset(channing, sex == "Male" & entry < exit)
-#' attach(chan)
-#' condKendall(entry, exit, cens)
-#' condKendall(entry, exit, cens, method = "IPW1")
-#' condKendall(entry, exit, cens, method = "IPW2")
-#' detach(chan)
-condKendall <- function(trun, obs, delta = NULL, method = "MB",
+#' @example inst/examples/ex_condKendall.R
+cKendall <- function(trun, obs, delta = NULL, method = "MB",
                         weights = NULL, a = 0, trans = "linear", ...) {
     methName <- c("MB", "IPW1", "IPW2")
     if (!(method %in% methName)) stop("Invalid method name", call. = FALSE)
@@ -144,7 +131,7 @@ condKendall <- function(trun, obs, delta = NULL, method = "MB",
     out$p.value <- 2 - 2 * pnorm(out$STAT)
     out$trans <- trans
     out$a <- a
-    class(out) <- "condKendall"
+    class(out) <- "cKendall"
     out
 }
 

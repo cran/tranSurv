@@ -1,13 +1,13 @@
-3455b8343505dc942c787e3bf56089df *DESCRIPTION
+724d2a7d861d7d4c447eb5db5126fa72 *DESCRIPTION
 226fd415c6d91defbf297c75912217b2 *NAMESPACE
-a41dd417e3df4bf61a220e3c52ae6f7a *NEWS.md
+101d6cbf9fe446f27632636236a2e96a *NEWS.md
 b11b1cf31660d66c41af2b53f6527462 *R/Surv.R
 341faf182b4861d92a9b94362aa5e988 *R/gof.R
 6e0cdaa93282296cc95252c29fc69b5c *R/kendalls.R
 51bd0789e9e94603b1f58e4cfdeddbba *R/plot.trSurvfit.R
 a26311401a741077fafb3fc7d2fa3d45 *R/pmcc.R
 f047e76b4cd567e90ce49227739d832e *R/summary.R
-3758aee136583c4e87ceec9f611b7bdb *R/trReg.R
+c67e190513d36660910344a0b00728dc *R/trReg.R
 c23dc52b066af2866975194d98546d34 *R/trSurv_pkg.R
 ab6e5d1732db14dfd3c1f56a9a86bdc5 *R/trSurvfit.R
 525595345642307637c9d6f04bfd6f7b *R/util.R
@@ -31,7 +31,7 @@ f2a30132733af65fc5f9fcb87e93c692 *man/plot.trSurvfit.Rd
 8707c04ce3d7224b6848af773a83562a *man/trReg.Rd
 c2212882831a3694b48226843ccc9eac *man/trSurv.control.Rd
 2ed93014eb89c7522666392e0b796cf2 *man/trSurvfit.Rd
-42d45085264e0b8ca7b74870ee622907 *man/tranSurv-package.Rd
+99c7bb9ccdf5638be614d196de230b1b *man/tranSurv-package.Rd
 c3b72c02366e2d76dc2caa01fa6c0b1a *man/wKendall.Rd
 1742012a403fc6411ce4d73f08543a57 *src/getKendall.c
 20a4836af78fa3d0f9aee4e6e1ce427d *src/init.c

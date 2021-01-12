@@ -23,6 +23,9 @@ trFit.kendall <- function(DF, engine, stdErr) {
             optimize(f = function(x) abs(getA(x, trun1, obs1, delta1,
                                               sc = engine@sc, FUN = engine@tFun)$PE),
                      tol = engine@tol, interval = c(grids[y], grids[y + 1])))
+        tmp2 <- optim(fn = function(x)
+            abs(getA(x, trun1, obs1, delta1, sc = engine@sc, FUN = engine@tFun)$PE), par = 0)
+        if (tmp2$par > -1) tmp <- cbind(tmp, c(tmp2$par, tmp2$value))
         a <- as.numeric(tmp[1, which.min(tmp[2,])])
     } else a <- engine@a    
     ta <- mapply(engine@tFun, X = obs1, T = trun1, a = a)
@@ -47,7 +50,10 @@ trFit.kendall2 <- function(DF, engine, stdErr) {
     out$breaks <- ti <- seq(min(ti), max(ti), length.out = P + 2)
     out$breaks[1] <- ti[1] <- -Inf
     out$breaks[length(ti)] <- ti[length(ti)] <- Inf
-    pwReg <- lapply(split(DF, cut(DF$stop, ti, include.lowest = TRUE)), function(d) {
+    p <- length(ti) - 1
+    dats <- split(DF, cut(DF$stop, ti, include.lowest = TRUE))
+    m <- lapply(dats, nrow)
+    pwReg <- lapply(dats, function(d) {
         tmp <- trReg(Surv(start, stop, status) ~ as.matrix(d[, engine@vNames]),
                      data = d, method = "kendall", B = 0, tFun = engine@tFun, 
                      control = list(engine@sc, G = engine@G, Q = engine@Q, a = engine@a, 
@@ -57,7 +63,23 @@ trFit.kendall2 <- function(DF, engine, stdErr) {
         tmp$.data$a <- tmp$a
         return(tmp$.data)
     })
+    a0 <- unique(do.call(rbind, pwReg)$a)
+    getA2 <- function(a) {
+        if (any(a <= -1)) return(Inf)
+        dat0 <- do.call(rbind, dats)
+        dat0$ta <- unlist(sapply(1:p, function(x)
+            mapply(engine@tFun, X = dats[[x]]$stop, T = dats[[x]]$start, a[x])))
+        dat0$wgtX <- approx(engine@sc$time, engine@sc$surv, dat0$stop, "constant", yleft = 1,
+                            yright = min(engine@sc$surv))$y       
+        cKendall(dat0$ta, dat0$stop, dat0$status, method = "IPW2", weights = dat0$wgtX)$PE
+    }
+    a1 <- optim(a0, fn = function(x) getA2(x)^2)
+    a2 <- optim(rep(0, p), fn = function(x) getA2(x)^2)
+    if (a1$value < a2$value) a <- a1$par
+    else a <- a2$par
     DF2 <- do.call(rbind, pwReg)
+    DF2$a <- rep(a, unlist(lapply(dats, nrow)))
+    DF2$ta <- mapply(engine@tFun, X = DF2$stop, T = DF2$start, a = DF2$a)        
     trun <- DF2$start
     obs <- DF2$stop
     delta <- DF2$status
@@ -109,10 +131,12 @@ trFit.adjust <- function(DF, engine, stdErr) {
             }
         }
         ## Filter out lower bound that gives warning (fail to converge in coxph)
-        boundary <- -1 + log(1 + 10^-(1:5), 10)
-        tmp <- sapply(boundary, function(x)
-            tryCatch(coxAj(x), warning = function(e) NA, error = function(e) NA))
-        engine@lower <- min(boundary[!is.na(tmp)])
+        if (engine@lower <= -1) {
+            boundary <- -1 + log(1 + 10^-(1:5), 10)
+            tmp <- sapply(boundary, function(x)
+                tryCatch(coxAj(x), warning = function(e) NA, error = function(e) NA))
+            engine@lower <- min(boundary[!is.na(tmp)])
+        }
         ## optimize in many grids
         grids <- seq(engine@lower, engine@upper, length.out = engine@G)
         grids <- c(grids, sapply(1:max(engine@Q, 1), function(z) 
@@ -122,6 +146,9 @@ trFit.adjust <- function(DF, engine, stdErr) {
         tmp <- sapply(1:(length(grids) - 1), function(y)
             optimize(f = function(x) suppressWarnings(coxAj(x)),
                      interval = c(grids[y], grids[y + 1])))
+        tmp2 <- suppressWarnings(
+            optim(fn = coxAj, par = 0, control = list(warn.1d.NelderMead = FALSE)))
+        if (tmp2$par > -1) tmp <- cbind(tmp, c(tmp2$par, tmp2$value))
         a <- as.numeric(tmp[1, which.min(tmp[2,])])
     } else a <- engine@a
     ta <- mapply(engine@tFun, X = obs1, T = trun1, a = a)
@@ -161,9 +188,9 @@ trFit.adjust2 <- function(DF, engine, stdErr) {
     out$breaks[1] <- ti[1] <- -Inf
     out$breaks[length(ti)] <- ti[length(ti)] <- Inf
     p <- length(ti) - 1
-    dats <-split(DF, cut(DF$stop, ti, include.lowest = TRUE) )
+    dats <-split(DF, cut(DF$stop, ti, include.lowest = TRUE))
     m <- lapply(dats, nrow)
-    pwReg <- lapply(split(DF, cut(DF$stop, ti, include.lowest = TRUE)), function(d) {
+    pwReg <- lapply(dats, function(d) {
         tmp <- trReg(Surv(start, stop, status) ~ as.matrix(d[, engine@vNames]),
                      data = d, method = "adjust", B = 0, tFun = engine@tFun, 
                      control = list(engine@sc, G = engine@G, Q = engine@Q, P = 0, a = engine@a,
@@ -186,8 +213,6 @@ trFit.adjust2 <- function(DF, engine, stdErr) {
             q1[1] <- -Inf
             q1[length(q1)] <- Inf
             covs <- model.matrix(~ cut(dat0$ta, breaks = q1, include.lowest = TRUE) - 1)
-
-
         } else covs <- dat0$ta
         fm <- as.formula(paste("Surv(ta, stop, status) ~ ", paste(engine@vNames, collapse = "+")))
         tmp <- update(coxph(fm, data = dat0, subset = status > 0, weights = 1 / wgtX), ~ . + covs)

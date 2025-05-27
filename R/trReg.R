@@ -30,7 +30,8 @@ trFit.kendall <- function(DF, engine, stdErr) {
     } else a <- engine@a    
     ta <- mapply(engine@tFun, X = obs1, T = trun1, a = a)
     out$PE <- coef(summary(coxph(Surv(ta, obs1, delta1) ~ as.matrix(DF[delta == 1, engine@vNames]),
-                                 weights = 1 / wgtX)))
+                                 weights = 1 / wgtX, robust = FALSE,
+                                 control = coxph.control(timefix = FALSE))))
     out$varNames <- rownames(out$PE) <- engine@vNames
     out$SE <- NA
     out$a <- a
@@ -92,7 +93,8 @@ trFit.kendall2 <- function(DF, engine, stdErr) {
                    yright = min(engine@sc$surv))$y
     suppressWarnings(out$PE <- coef(summary(coxph(Surv(ta1, obs1, delta1) ~
                                                       as.matrix(DF2[delta == 1, engine@vNames]),
-                                                  weights = 1 / wgtX))))
+                                                  weights = 1 / wgtX, robust = FALSE,
+                                                  control = coxph.control(timefix = FALSE)))))
     out$varNames <- rownames(out$PE) <- engine@vNames
     out$SE <- NA
     out$a <- unique(DF2$a)
@@ -122,7 +124,8 @@ trFit.adjust <- function(DF, engine, stdErr) {
             else covs <- ta
             tmp <- coxph(Surv(ta, obs1, delta1) ~
                              as.matrix(DF[delta == 1, engine@vNames]) + covs,
-                         weights = 1 / wgtX)
+                         weights = 1 / wgtX, robust = FALSE,
+                         control = coxph.control(timefix = FALSE))
             if (see) {
                 return(min(sum(coef(tmp)[-(1:length(engine@vNames))]^2, na.rm = TRUE), 1e4))
             } else {
@@ -147,7 +150,9 @@ trFit.adjust <- function(DF, engine, stdErr) {
             optimize(f = function(x) suppressWarnings(coxAj(x)),
                      interval = c(grids[y], grids[y + 1])))
         tmp2 <- suppressWarnings(
-            optim(fn = coxAj, par = 0, control = list(warn.1d.NelderMead = FALSE)))
+            optim(fn = function(a) {
+                if (a <= min(grids)) return(Inf)
+                return(coxAj(a)) }, par = 0, control = list(warn.1d.NelderMead = FALSE)))
         if (tmp2$par > -1) tmp <- cbind(tmp, c(tmp2$par, tmp2$value))
         a <- as.numeric(tmp[1, which.min(tmp[2,])])
     } else a <- engine@a
@@ -158,7 +163,7 @@ trFit.adjust <- function(DF, engine, stdErr) {
     } else covs <- ta
     out$PE <- coef(summary(coxph(Surv(ta, obs1, delta1) ~
                                      as.matrix(DF[delta == 1,engine@vNames]) + covs,
-                                 weights = 1 / wgtX)))
+                                 weights = 1 / wgtX, robust = FALSE, control = coxph.control(timefix = FALSE))))
     out$PEta <- out$PE[-(1:(length(engine@vNames))),,drop = FALSE]
     out$PE <- out$PE[1:(length(engine@vNames)),,drop = FALSE]
     if (engine@Q > 0) {
@@ -215,7 +220,8 @@ trFit.adjust2 <- function(DF, engine, stdErr) {
             covs <- model.matrix(~ cut(dat0$ta, breaks = q1, include.lowest = TRUE) - 1)
         } else covs <- dat0$ta
         fm <- as.formula(paste("Surv(ta, stop, status) ~ ", paste(engine@vNames, collapse = "+")))
-        tmp <- update(coxph(fm, data = dat0, subset = status > 0, weights = 1 / wgtX), ~ . + covs)
+        tmp <- update(coxph(fm, data = dat0, subset = status > 0, weights = 1 / wgtX), ~ . + covs,
+                      robust = FALSE, control = coxph.control(timefix = FALSE))
         if (model) {
             nn <- NULL
             if (engine@Q > 0) {
@@ -315,7 +321,7 @@ setMethod("trFit", signature(engine = "adjust2", stdErr = "bootstrap"), trFit.bo
 #'
 #' The main assumption on the structural transformation model is that it assumes there is a latent, quasi-independent truncation time
 #' that is associated with the observed dependent truncation time, the event time, and an unknown dependence parameter
-#' through a specified funciton.
+#' through a specified function.
 #' The structure of the transformation model is of the form:
 #' \deqn{h(U) = (1 + a)^{-1} \times (h(T) + ah(X)),} where \eqn{T} is the truncation time, \eqn{X} is the observed failure time,
 #' \eqn{U} is the transformed truncation time that is quasi-independent from \eqn{X} and \eqn{h(\cdot)} is a monotonic transformation function.
@@ -354,7 +360,7 @@ setMethod("trFit", signature(engine = "adjust2", stdErr = "bootstrap"), trFit.bo
 #'   \item{\code{G}}{The number of grids used in the search for the transformation parameter; default is 50.
 #' A smaller \code{G} could results in faster search, but might be inaccurate.}
 #'   \item{\code{Q}}{The number of cutpoints for the truncation time used when \code{method = "adjust"}. The default is 0.}
-#'   \item{\code{P}}{The number of breakpoints to divide the event times into equally spaced segmenets.
+#'   \item{\code{P}}{The number of breakpoints to divide the event times into equally spaced segments.
 #' When \code{P > 1}, the latent truncation time, \eqn{T'(a)} will be computed in each subset.
 #' The transformation model is then applied to the aggregated data.} 
 #'   \item{\code{a}}{The transformation parameter. When this is specified, the transformation model is applied based on the specified \code{a}.
@@ -365,11 +371,26 @@ setMethod("trFit", signature(engine = "adjust2", stdErr = "bootstrap"), trFit.bo
 #' }
 #'
 #' 
-#' @importFrom survival is.Surv coxph
+#' @importFrom survival is.Surv coxph coxph.control
 #' @importFrom methods getClass
 #' @seealso \code{\link{trSurvfit}}
 #' 
 #' @export
+#'
+#' @return A \code{trReg} object containing the following components:
+#' \describe{
+#'   \item{\code{PE}}{A named numeric matrix of point estimates and related statistics (e.g., coefficient, exponentiated coefficient, standard error, z-score, and p-value).}
+#'   \item{\code{varNames}}{Character string giving the name(s) of the covariates.}
+#'   \item{\code{SE}}{A numeric vector contains the bootstrap standard error.}
+#'   \item{\code{a}}{Estimated transformation parameter.}
+#'   \item{\code{Call}}{The matched call to the fitting function.}
+#'   \item{\code{B}, \code{Q}, \code{P}}{Model parameters; \code{B} is the bootstrap sapmle, \code{Q} is the number of cutpoints, and \code{P} is the number of break points. See \bold{Details}.}
+#'   \item{\code{tFun}}{A function defining the transformation model.}
+#'   \item{\code{vNames}}{Character vector of covariate names.}
+#'   \item{\code{method}}{Character string specifying the estimation method (e.g., \code{"kendall"} or \code{"adjust"}).}
+#'   \item{\code{.data}}{A data frame used in fitting.}
+#' }
+#' 
 #' @example inst/examples/ex_trReg.R
 trReg <- function(formula, data, subset, tFun = "linear",
                   method = c("kendall", "adjust"),
@@ -384,7 +405,7 @@ trReg <- function(formula, data, subset, tFun = "linear",
     stdErr <- do.call("new", c(list(Class = "bootstrap"), stdErr.control))
     stdErr@B <- B
     if (B == 0) class(stdErr)[[1]] <- "NULL"
-    if (class(tFun) == "character") {
+    if (inherits(tFun, "character")) {
         if (tFun == "linear") engine@tFun <- function(X, T, a) (T + a * X) / (1 + a)
         if (tFun == "log") engine@tFun <- function(X, T, a) exp((log(replace(T, 0, 1)) + a * log(X)) / (1 + a))
         if (tFun == "log2") engine@tFun <- function(X, T, a) exp((1 + a) * log(replace(T, 0, 1)) - a * log(X))
@@ -410,6 +431,11 @@ trReg <- function(formula, data, subset, tFun = "linear",
         sc <- survfit(Surv(start, stop, 1 - status) ~ 1, data = DF)
         if (min(sc$surv) == 0) 
             sc$surv <- ifelse(sc$surv == min(sc$surv), sort(unique(sc$surv))[2], sc$surv)
+        if (length(table(DF$status)) > 1 &
+            sum(head(sc$n.event[sc$n.event > 0] / sc$n.risk[sc$n.event > 0]) == 1) <= 2) {
+            sc$time <- sc$time[sc$n.event > 0]
+            sc$surv <- exp(-cumsum(sc$n.event[sc$n.event > 0] / sc$n.risk[sc$n.event > 0]))
+        }
         engine@sc <- list(time = sc$time, surv = sc$surv)
     }
     if (formula == ~1) {

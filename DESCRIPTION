@@ -1,6 +1,6 @@
 Package: tranSurv
 Title: Transformation-Based Regression under Dependent Truncation
-Version: 1.2.3
+Version: 1.2.4
 Authors@R: c(person(given = "Sy Han (Steven)", family = "Chiou",
 	     email = "schiou@smu.edu",
 	     role = c("aut", "cre")),
@@ -15,9 +15,9 @@ RoxygenNote: 7.3.2
 Imports: rootSolve, truncSP, survival, SQUAREM, methods
 Suggests: MASS, boot
 NeedsCompilation: yes
-Packaged: 2025-05-24 04:10:09 UTC; schiou
+Packaged: 2025-09-22 13:51:50 UTC; schiou
 Author: Sy Han (Steven) Chiou [aut, cre],
   Jing Qian [aut]
 Maintainer: Sy Han (Steven) Chiou <schiou@smu.edu>
 Repository: CRAN
-Date/Publication: 2025-05-27 09:40:02 UTC
+Date/Publication: 2025-09-22 14:20:02 UTC
